@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tic Tac Toe Online 🔥</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #f4f4f4;
+    }
+    h1 { margin-top: 20px; }
+    #status { font-weight: bold; margin: 10px; }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      gap: 5px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .cell {
+      width: 100px;
+      height: 100px;
+      font-size: 48px;
+      background: white;
+      border: 2px solid #444;
+      line-height: 100px;
+      cursor: pointer;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔥 Tic Tac Toe Online</h1>
+  <div id="status">Connecting...</div>
+  <div class="board" id="board"></div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+
+  <script>
+    // ✅ Your Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDKtXP4MGQQvaTUYnON5XPDdtosWM50_8I",
+      authDomain: "player-online-game-8f6db.firebaseapp.com",
+      databaseURL: "https://player-online-game-8f6db-default-rtdb.firebaseio.com",
+      projectId: "player-online-game-8f6db",
+      storageBucket: "player-online-game-8f6db.appspot.com",
+      messagingSenderId: "881838715321",
+      appId: "1:881838715321:web:9b35fce1fff16512c28668"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    let userId, gameId, isPlayerX;
+    const statusDiv = document.getElementById("status");
+    const boardDiv = document.getElementById("board");
+
+    // 👤 Authenticate anonymously
+    firebase.auth().signInAnonymously().then(user => {
+      userId = user.user.uid;
+      findMatch();
+    });
+
+    // 🔄 Create board UI
+    function renderBoard(board, turn, winner) {
+      boardDiv.innerHTML = '';
+      board.forEach((cell, i) => {
+        const div = document.createElement('div');
+        div.className = 'cell';
+        div.textContent = cell;
+        div.onclick = () => {
+          if (!cell && turn === (isPlayerX ? 'X' : 'O') && !winner) {
+            db.collection('games').doc(gameId).update({
+              [`board.${i}`]: isPlayerX ? 'X' : 'O',
+              turn: isPlayerX ? 'O' : 'X'
+            });
+          }
+        };
+        boardDiv.appendChild(div);
+      });
+    }
+
+    // 🎯 Matchmaking Logic
+    async function findMatch() {
+      statusDiv.textContent = "Looking for opponent...";
+      const waitRef = db.collection('waiting').doc('queue');
+      const gameRef = db.collection('games');
+
+      await db.runTransaction(async tx => {
+        const doc = await tx.get(waitRef);
+        if (!doc.exists || !doc.data().player) {
+          tx.set(waitRef, { player: userId });
+        } else {
+          const opponentId = doc.data().player;
+          const newGame = {
+            playerX: opponentId,
+            playerO: userId,
+            board: ["", "", "", "", "", "", "", "", ""],
+            turn: "X",
+            winner: null
+          };
+          const newDoc = gameRef.doc();
+          tx.set(newDoc, newGame);
+          tx.delete(waitRef);
+          gameId = newDoc.id;
+          isPlayerX = false;
+        }
+      });
+
+      if (!gameId) {
+        // Waiting player, listen for game
+        const unsubscribe = db.collection('games')
+          .where('playerX', '==', userId)
+          .onSnapshot(snapshot => {
+            snapshot.forEach(doc => {
+              gameId = doc.id;
+              isPlayerX = true;
+              unsubscribe();
+              subscribeGame();
+            });
+          });
+      } else {
+        subscribeGame();
+      }
+    }
+
+    // 📡 Subscribe to Game Updates
+    function subscribeGame() {
+      db.collection('games').doc(gameId).onSnapshot(doc => {
+        const data = doc.data();
+        const me = isPlayerX ? 'X' : 'O';
+        const enemy = isPlayerX ? 'O' : 'X';
+        renderBoard(data.board, data.turn, data.winner);
+
+        if (data.winner) {
+          if (data.winner === me) statusDiv.textContent = "🎉 You Win!";
+          else if (data.winner === enemy) statusDiv.textContent = "😢 You Lose!";
+          else statusDiv.textContent = "🤝 It's a Draw!";
+        } else if (data.turn === me) {
+          statusDiv.textContent = "Your Turn";
+        } else {
+          statusDiv.textContent = "Opponent's Turn";
+        }
+
+        if (!data.winner) {
+          const win = checkWin(data.board);
+          if (win) db.collection('games').doc(gameId).update({ winner: win });
+          else if (!data.board.includes("")) db.collection('games').doc(gameId).update({ winner: "Draw" });
+        }
+      });
+    }
+
+    // 🏆 Win Check
+    function checkWin(b) {
+      const combos = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      for (let [a,b1,c] of combos)
+        if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
+      return null;
+    }
+  </script>
+
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>eruda.init();</script>
+</body>
+</html>
