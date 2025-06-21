@@ -27,10 +27,15 @@ function renderBoard(board, turn, winner) {
     div.textContent = cell;
     div.onclick = () => {
       if (!cell && turn === (isPlayerX ? 'X' : 'O') && !winner) {
-        db.collection("games").doc(gameId).update({
-          [`board.${i}`]: isPlayerX ? 'X' : 'O',
-          turn: isPlayerX ? 'O' : 'X'
-        });
+        db.collection("games").doc(gameId).get().then(doc => {
+  const game = doc.data();
+  const board = [...game.board];
+  board[i] = isPlayerX ? 'X' : 'O';
+  db.collection("games").doc(gameId).update({
+    board: board,
+    turn: isPlayerX ? 'O' : 'X'
+  });
+});
       }
     };
     boardDiv.appendChild(div);
