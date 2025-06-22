@@ -1,3 +1,4 @@
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyDKtXP4MGQQvaTUYnON5XPDdtosWM50_8I",
   authDomain: "player-online-game-8f6db.firebaseapp.com",
@@ -10,6 +11,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
+// DOM Elements
 const startScreen = document.getElementById("startScreen");
 const gameScreen = document.getElementById("gameScreen");
 const startBtn = document.getElementById("startBtn");
@@ -20,24 +22,42 @@ const cancelBtn = document.getElementById("cancelBtn");
 let userId, gameId, isPlayerX;
 let unsubGameListener = null;
 
+// ✅ Trap system back button
+function blockBack() {
+  history.pushState(null, null, location.href);
+}
+
+// ✅ Start Game
 startBtn.onclick = () => {
   startScreen.style.display = "none";
   gameScreen.style.display = "block";
+  cancelBtn.style.display = "inline-block";
   statusDiv.textContent = "Looking for opponent...";
+
   firebase.auth().signInAnonymously().then(user => {
     userId = user.user.uid;
+
+    // ✅ Enable cleanup on refresh
+    window.addEventListener("beforeunload", cleanupMatch);
+
+    // ✅ Prevent back button
+    history.pushState(null, null, location.href);
+    window.addEventListener("popstate", blockBack);
+
     findMatch();
   });
 };
 
+// ✅ Cancel Matchmaking
 cancelBtn.onclick = () => {
   cleanupMatch();
   returnToStart();
 };
 
-window.addEventListener("beforeunload", cleanupMatch);
-
+// ✅ Return to Start
 function returnToStart() {
+  window.removeEventListener("popstate", blockBack); // Allow back again
+  window.removeEventListener("beforeunload", cleanupMatch); // Remove cleanup
   boardDiv.innerHTML = "";
   statusDiv.textContent = "Waiting...";
   gameId = null;
@@ -46,12 +66,14 @@ function returnToStart() {
   gameScreen.style.display = "none";
 }
 
+// ✅ Clean queue / unfinished game
 function cleanupMatch() {
   db.collection("waiting").doc("queue").get().then(doc => {
     if (doc.exists && doc.data().player === userId) {
       db.collection("waiting").doc("queue").delete();
     }
   });
+
   if (gameId && isPlayerX) {
     db.collection("games").doc(gameId).get().then(doc => {
       if (doc.exists && !doc.data().winner) {
@@ -59,12 +81,14 @@ function cleanupMatch() {
       }
     });
   }
+
   if (typeof unsubGameListener === "function") {
     unsubGameListener();
     unsubGameListener = null;
   }
 }
 
+// ✅ Render Game Board
 function renderBoard(board, turn, winner) {
   boardDiv.innerHTML = '';
   board.forEach((cell, i) => {
@@ -88,6 +112,7 @@ function renderBoard(board, turn, winner) {
   });
 }
 
+// ✅ Matchmaking
 async function findMatch() {
   const waitRef = db.collection("waiting").doc("queue");
   const gamesRef = db.collection("games");
@@ -127,7 +152,10 @@ async function findMatch() {
   }
 }
 
+// ✅ Game Updates
 function subscribeGame() {
+  cancelBtn.style.display = "none"; // ✅ Hide cancel once game begins
+
   unsubGameListener = db.collection("games").doc(gameId).onSnapshot(doc => {
     const data = doc.data();
     const mySymbol = isPlayerX ? "X" : "O";
@@ -142,9 +170,7 @@ function subscribeGame() {
 
       if (isPlayerX) {
         setTimeout(() => {
-          db.collection("games").doc(gameId).delete().then(() => {
-            console.log("Game room deleted");
-          });
+          db.collection("games").doc(gameId).delete();
         }, 1000);
       }
 
@@ -163,6 +189,7 @@ function subscribeGame() {
   });
 }
 
+// ✅ Check for Win
 function checkWin(b) {
   const lines = [
     [0,1,2], [3,4,5], [6,7,8],
