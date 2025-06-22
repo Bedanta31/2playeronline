@@ -7,11 +7,10 @@ const firebaseConfig = {
   messagingSenderId: "881838715321",
   appId: "1:881838715321:web:9b35fce1fff16512c28668"
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// DOM Elements
+// DOM
 const startScreen = document.getElementById("startScreen");
 const gameScreen = document.getElementById("gameScreen");
 const startBtn = document.getElementById("startBtn");
@@ -22,12 +21,27 @@ const cancelBtn = document.getElementById("cancelBtn");
 let userId, gameId, isPlayerX;
 let unsubGameListener = null;
 
-// ✅ Trap system back button
+// 🧠 Try cleanup from previous session
+window.addEventListener("DOMContentLoaded", () => {
+  const savedUser = localStorage.getItem("userId");
+  const savedGame = localStorage.getItem("gameId");
+  const savedRole = localStorage.getItem("isPlayerX");
+
+  if (savedUser) {
+    userId = savedUser;
+    gameId = savedGame;
+    isPlayerX = savedRole === "true";
+    cleanupMatch(); // 🔥 Immediately clean up
+    localStorage.clear();
+  }
+});
+
+// ✅ Back button trap
 function blockBack() {
   history.pushState(null, null, location.href);
 }
 
-// ✅ Start Game
+// ✅ Start Matchmaking
 startBtn.onclick = () => {
   startScreen.style.display = "none";
   gameScreen.style.display = "block";
@@ -37,47 +51,57 @@ startBtn.onclick = () => {
   firebase.auth().signInAnonymously().then(user => {
     userId = user.user.uid;
 
-    // ✅ Enable cleanup on refresh
-    window.addEventListener("beforeunload", cleanupMatch);
+    // Save for refresh recovery
+    localStorage.setItem("userId", userId);
 
-    // ✅ Prevent back button
-    history.pushState(null, null, location.href);
-    window.addEventListener("popstate", blockBack);
+    // Trap system back button AFTER a short delay
+    setTimeout(() => {
+      history.pushState(null, null, location.href);
+      window.addEventListener("popstate", blockBack);
+    }, 200);
 
     findMatch();
   });
 };
 
-// ✅ Cancel Matchmaking
+// ✅ Cancel
 cancelBtn.onclick = () => {
   cleanupMatch();
   returnToStart();
 };
 
-// ✅ Return to Start
+// ✅ Return
 function returnToStart() {
-  window.removeEventListener("popstate", blockBack); // Allow back again
-  window.removeEventListener("beforeunload", cleanupMatch); // Remove cleanup
+  window.removeEventListener("popstate", blockBack);
+  window.removeEventListener("beforeunload", cleanupMatch);
+  localStorage.clear();
+
   boardDiv.innerHTML = "";
   statusDiv.textContent = "Waiting...";
   gameId = null;
   isPlayerX = false;
+
   startScreen.style.display = "block";
   gameScreen.style.display = "none";
 }
 
-// ✅ Clean queue / unfinished game
+// ✅ Cleanup queue or game
 function cleanupMatch() {
-  db.collection("waiting").doc("queue").get().then(doc => {
-    if (doc.exists && doc.data().player === userId) {
-      db.collection("waiting").doc("queue").delete();
-    }
-  });
+  const queueRef = db.collection("waiting").doc("queue");
+  const gameRef = gameId ? db.collection("games").doc(gameId) : null;
 
-  if (gameId && isPlayerX) {
-    db.collection("games").doc(gameId).get().then(doc => {
+  if (userId) {
+    queueRef.get().then(doc => {
+      if (doc.exists && doc.data().player === userId) {
+        queueRef.delete();
+      }
+    });
+  }
+
+  if (gameRef && isPlayerX) {
+    gameRef.get().then(doc => {
       if (doc.exists && !doc.data().winner) {
-        db.collection("games").doc(gameId).delete();
+        gameRef.delete();
       }
     });
   }
@@ -88,7 +112,7 @@ function cleanupMatch() {
   }
 }
 
-// ✅ Render Game Board
+// ✅ Board Rendering
 function renderBoard(board, turn, winner) {
   boardDiv.innerHTML = '';
   board.forEach((cell, i) => {
@@ -98,8 +122,7 @@ function renderBoard(board, turn, winner) {
     div.onclick = () => {
       if (!cell && turn === (isPlayerX ? 'X' : 'O') && !winner) {
         db.collection("games").doc(gameId).get().then(doc => {
-          const game = doc.data();
-          const updatedBoard = [...game.board];
+          const updatedBoard = [...doc.data().board];
           updatedBoard[i] = isPlayerX ? 'X' : 'O';
           db.collection("games").doc(gameId).update({
             board: updatedBoard,
@@ -126,7 +149,7 @@ async function findMatch() {
       const newGame = {
         playerX: opponent,
         playerO: userId,
-        board: ["", "", "", "", "", "", "", "", ""],
+        board: Array(9).fill(""),
         turn: "X",
         winner: null
       };
@@ -135,6 +158,10 @@ async function findMatch() {
       tx.delete(waitRef);
       gameId = newDoc.id;
       isPlayerX = false;
+
+      // Save to recover
+      localStorage.setItem("gameId", gameId);
+      localStorage.setItem("isPlayerX", "false");
     }
   });
 
@@ -144,6 +171,10 @@ async function findMatch() {
         gameId = doc.id;
         isPlayerX = true;
         unsub();
+
+        localStorage.setItem("gameId", gameId);
+        localStorage.setItem("isPlayerX", "true");
+
         subscribeGame();
       });
     });
@@ -152,21 +183,22 @@ async function findMatch() {
   }
 }
 
-// ✅ Game Updates
+// ✅ Listen to Game
 function subscribeGame() {
-  cancelBtn.style.display = "none"; // ✅ Hide cancel once game begins
+  cancelBtn.style.display = "none"; // hide cancel once game starts
 
   unsubGameListener = db.collection("games").doc(gameId).onSnapshot(doc => {
     const data = doc.data();
-    const mySymbol = isPlayerX ? "X" : "O";
-    const enemySymbol = isPlayerX ? "O" : "X";
+    const me = isPlayerX ? "X" : "O";
+    const them = isPlayerX ? "O" : "X";
 
     renderBoard(data.board, data.turn, data.winner);
 
     if (data.winner) {
-      if (data.winner === mySymbol) statusDiv.textContent = "🎉 You Win!";
-      else if (data.winner === enemySymbol) statusDiv.textContent = "😢 You Lose!";
-      else statusDiv.textContent = "🤝 It's a Draw!";
+      statusDiv.textContent =
+        data.winner === me ? "🎉 You Win!" :
+        data.winner === them ? "😢 You Lose!" :
+        "🤝 It's a Draw!";
 
       if (isPlayerX) {
         setTimeout(() => {
@@ -174,11 +206,9 @@ function subscribeGame() {
         }, 1000);
       }
 
-      setTimeout(() => {
-        returnToStart();
-      }, 2000);
+      setTimeout(() => returnToStart(), 2000);
     } else {
-      statusDiv.textContent = data.turn === mySymbol ? "Your Turn" : "Opponent's Turn";
+      statusDiv.textContent = data.turn === me ? "Your Turn" : "Opponent's Turn";
     }
 
     if (!data.winner) {
