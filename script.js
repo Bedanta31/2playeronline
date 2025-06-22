@@ -17,6 +17,8 @@ const gameScreen = document.getElementById("gameScreen");
 const startBtn = document.getElementById("startBtn");
 const boardDiv = document.getElementById("board");
 const statusDiv = document.getElementById("status");
+const cancelBtn = document.getElementById("cancelBtn");
+let unsubGameListener = null;
 
 let userId, gameId, isPlayerX;
 
@@ -109,7 +111,7 @@ async function findMatch() {
 
 // Realtime game updates
 function subscribeGame() {
-  db.collection("games").doc(gameId).onSnapshot(doc => {
+  unsubGameListener = db.collection("games").doc(gameId).onSnapshot(doc => {
     const data = doc.data();
     const mySymbol = isPlayerX ? "X" : "O";
     const enemySymbol = isPlayerX ? "O" : "X";
@@ -163,3 +165,29 @@ function checkWin(b) {
   }
   return null;
 }
+
+function cleanupMatch() {
+  // Remove from waiting queue if still there
+  db.collection("waiting").doc("queue").get().then(doc => {
+    if (doc.exists && doc.data().player === userId) {
+      db.collection("waiting").doc("queue").delete();
+    }
+  });
+
+  // If in a game but not finished, delete it (only playerX to avoid double-delete)
+  if (gameId && isPlayerX) {
+    db.collection("games").doc(gameId).get().then(doc => {
+      const data = doc.data();
+      if (data && !data.winner) {
+        db.collection("games").doc(gameId).delete();
+      }
+    });
+  }
+
+  // Stop any active Firestore listeners
+  if (typeof unsubGameListener === "function") {
+    unsubGameListener();
+    unsubGameListener = null;
+  }
+}
+window.addEventListener("beforeunload", cleanupMatch);
