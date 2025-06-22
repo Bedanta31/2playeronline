@@ -1,3 +1,14 @@
+const rematchBtn = document.getElementById("rematchBtn");
+rematchBtn.onclick = () => {
+  if (gameId) {
+    db.collection("games").doc(gameId).delete().then(() => {
+      rematchBtn.style.display = "none";
+      statusDiv.textContent = "Restarting match...";
+      findMatch();
+    });
+  }
+};
+
 const firebaseConfig = {
   apiKey: "AIzaSyDKtXP4MGQQvaTUYnON5XPDdtosWM50_8I",
   authDomain: "player-online-game-8f6db.firebaseapp.com",
