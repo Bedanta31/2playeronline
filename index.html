@@ -6,28 +6,24 @@
   <base href="." />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="style.css" />
-
-  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
-
   <!-- Start Screen -->
   <div id="startScreen">
     <h1>🔥 Tic Tac Toe Online</h1>
     <button id="startBtn">Start Game</button>
   </div>
 
-  <!-- Game Screen (initially hidden) -->
+  <!-- Game Screen -->
   <div id="gameScreen" style="display:none;">
-    <div id="status">Waiting for opponent...</div>
+    <div id="status">Waiting...</div>
     <div class="board" id="board"></div>
-    <button id="cancelBtn" style="margin-top: 20px;">❌ Cancel</button>
+    <button id="cancelBtn">❌ Cancel</button>
   </div>
 
-  <!-- Your JS Logic -->
   <script src="script.js"></script>
 </body>
 </html>
