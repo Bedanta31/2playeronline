@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>Tic Tac Toe Online</title>
-  <base href="." />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -11,6 +10,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
+
   <!-- Start Screen -->
   <div id="startScreen">
     <h1>🔥 Tic Tac Toe Online</h1>
@@ -24,11 +24,12 @@
     <button id="cancelBtn">❌ Cancel</button>
   </div>
 
+  <!-- Game Logic -->
   <script src="script.js"></script>
-  <!-- Eruda Developer Console for Mobile -->
-<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>
-  eruda.init();
-</script>
+
+  <!-- Eruda Dev Console for Mobile Debugging -->
+  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+  <script>eruda.init();</script>
+
 </body>
 </html>
