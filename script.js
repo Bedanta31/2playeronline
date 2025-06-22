@@ -1,4 +1,3 @@
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyDKtXP4MGQQvaTUYnON5XPDdtosWM50_8I",
   authDomain: "player-online-game-8f6db.firebaseapp.com",
@@ -11,55 +10,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// DOM Elements
-const startScreen = document.getElementById("startScreen");
-const gameScreen = document.getElementById("gameScreen");
-const startBtn = document.getElementById("startBtn");
-const boardDiv = document.getElementById("board");
-const statusDiv = document.getElementById("status");
-const cancelBtn = document.getElementById("cancelBtn");
-let unsubGameListener = null;
-
-let userId, gameId, isPlayerX;
-
-// Start Game button
-startBtn.onclick = () => {
-  startScreen.style.display = "none";
-  gameScreen.style.display = "block";
-  statusDiv.textContent = "Looking for opponent...";
-
-  firebase.auth().signInAnonymously().then(user => {
-    userId = user.user.uid;
-    findMatch();
-  });
-};
-
-// Return to Start Screen
-function returnToStart() {
-  boardDiv.innerHTML = "";
-  statusDiv.textContent = "Waiting...";
-  gameId = null;
-  isPlayerX = false;
-  startScreen.style.display = "block";
-  gameScreen.style.display = "none";
-}
-
-// Draw board
-function renderBoard(board, turn, winner) {
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyDKtXP4MGQQvaTUYnON5XPDdtosWM50_8I",
-  authDomain: "player-online-game-8f6db.firebaseapp.com",
-  projectId: "player-online-game-8f6db",
-  storageBucket: "player-online-game-8f6db.appspot.com",
-  messagingSenderId: "881838715321",
-  appId: "1:881838715321:web:9b35fce1fff16512c28668"
-};
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-
-// DOM Elements
 const startScreen = document.getElementById("startScreen");
 const gameScreen = document.getElementById("gameScreen");
 const startBtn = document.getElementById("startBtn");
@@ -70,28 +20,23 @@ const cancelBtn = document.getElementById("cancelBtn");
 let userId, gameId, isPlayerX;
 let unsubGameListener = null;
 
-// ✅ Start Game button
 startBtn.onclick = () => {
   startScreen.style.display = "none";
   gameScreen.style.display = "block";
   statusDiv.textContent = "Looking for opponent...";
-
   firebase.auth().signInAnonymously().then(user => {
     userId = user.user.uid;
     findMatch();
   });
 };
 
-// ✅ Cancel button click
 cancelBtn.onclick = () => {
   cleanupMatch();
   returnToStart();
 };
 
-// ✅ Cleanup on refresh/close
 window.addEventListener("beforeunload", cleanupMatch);
 
-// ✅ Return to Start Screen
 function returnToStart() {
   boardDiv.innerHTML = "";
   statusDiv.textContent = "Waiting...";
@@ -101,16 +46,12 @@ function returnToStart() {
   gameScreen.style.display = "none";
 }
 
-// ✅ Cancel / Refresh Cleanup
 function cleanupMatch() {
-  // Remove from waiting queue
   db.collection("waiting").doc("queue").get().then(doc => {
     if (doc.exists && doc.data().player === userId) {
       db.collection("waiting").doc("queue").delete();
     }
   });
-
-  // If in game, delete it (only Player X)
   if (gameId && isPlayerX) {
     db.collection("games").doc(gameId).get().then(doc => {
       if (doc.exists && !doc.data().winner) {
@@ -118,15 +59,12 @@ function cleanupMatch() {
       }
     });
   }
-
-  // Unsubscribe listener
   if (typeof unsubGameListener === "function") {
     unsubGameListener();
     unsubGameListener = null;
   }
 }
 
-// ✅ Draw board grid
 function renderBoard(board, turn, winner) {
   boardDiv.innerHTML = '';
   board.forEach((cell, i) => {
@@ -150,7 +88,6 @@ function renderBoard(board, turn, winner) {
   });
 }
 
-// ✅ Find or create a match
 async function findMatch() {
   const waitRef = db.collection("waiting").doc("queue");
   const gamesRef = db.collection("games");
@@ -176,7 +113,6 @@ async function findMatch() {
     }
   });
 
-  // Wait for game to be created (if we were added to queue)
   if (!gameId) {
     const unsub = gamesRef.where("playerX", "==", userId).onSnapshot(snapshot => {
       snapshot.forEach(doc => {
@@ -191,7 +127,6 @@ async function findMatch() {
   }
 }
 
-// ✅ Realtime Game Updates
 function subscribeGame() {
   unsubGameListener = db.collection("games").doc(gameId).onSnapshot(doc => {
     const data = doc.data();
@@ -205,7 +140,6 @@ function subscribeGame() {
       else if (data.winner === enemySymbol) statusDiv.textContent = "😢 You Lose!";
       else statusDiv.textContent = "🤝 It's a Draw!";
 
-      // Delete game after match ends
       if (isPlayerX) {
         setTimeout(() => {
           db.collection("games").doc(gameId).delete().then(() => {
@@ -214,7 +148,6 @@ function subscribeGame() {
         }, 1000);
       }
 
-      // Return to start
       setTimeout(() => {
         returnToStart();
       }, 2000);
@@ -222,7 +155,6 @@ function subscribeGame() {
       statusDiv.textContent = data.turn === mySymbol ? "Your Turn" : "Opponent's Turn";
     }
 
-    // Auto check winner
     if (!data.winner) {
       const winner = checkWin(data.board);
       if (winner) db.collection("games").doc(gameId).update({ winner });
@@ -231,7 +163,6 @@ function subscribeGame() {
   });
 }
 
-// ✅ Winner Check Logic
 function checkWin(b) {
   const lines = [
     [0,1,2], [3,4,5], [6,7,8],
@@ -242,4 +173,4 @@ function checkWin(b) {
     if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
   }
   return null;
-      }
+}
