@@ -21,7 +21,7 @@ const cancelBtn = document.getElementById("cancelBtn");
 let userId, gameId, isPlayerX;
 let unsubGameListener = null;
 
-// 🧠 Try cleanup from previous session
+// Cleanup from old session on page load
 window.addEventListener("DOMContentLoaded", () => {
   const savedUser = localStorage.getItem("userId");
   const savedGame = localStorage.getItem("gameId");
@@ -36,12 +36,12 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// ✅ Back button trap
+// Prevent back navigation
 function blockBack() {
   history.pushState(null, null, location.href);
 }
 
-// ✅ Start Matchmaking
+// Start game
 startBtn.onclick = () => {
   startScreen.style.display = "none";
   gameScreen.style.display = "block";
@@ -50,11 +50,9 @@ startBtn.onclick = () => {
 
   firebase.auth().signInAnonymously().then(user => {
     userId = user.user.uid;
-
-    // Save for refresh recovery
     localStorage.setItem("userId", userId);
 
-    // Trap system back button
+    // Trap back button
     setTimeout(() => {
       history.pushState(null, null, location.href);
       window.addEventListener("popstate", blockBack);
@@ -64,13 +62,13 @@ startBtn.onclick = () => {
   });
 };
 
-// ✅ Cancel Matchmaking
+// Cancel matchmaking
 cancelBtn.onclick = () => {
   cleanupMatch();
   returnToStart();
 };
 
-// ✅ Return to Start
+// Return to start screen
 function returnToStart() {
   window.removeEventListener("popstate", blockBack);
   window.removeEventListener("beforeunload", cleanupMatch);
@@ -85,7 +83,7 @@ function returnToStart() {
   gameScreen.style.display = "none";
 }
 
-// ✅ Cleanup waiting or game
+// Cleanup game or queue
 function cleanupMatch() {
   const queueRef = db.collection("waiting").doc("queue");
   const gameRef = gameId ? db.collection("games").doc(gameId) : null;
@@ -112,7 +110,7 @@ function cleanupMatch() {
   }
 }
 
-// ✅ Draw board
+// Render board with secure move
 function renderBoard(board, turn, winner) {
   boardDiv.innerHTML = '';
   board.forEach((cell, i) => {
@@ -120,22 +118,29 @@ function renderBoard(board, turn, winner) {
     div.className = 'cell';
     div.textContent = cell;
     div.onclick = () => {
-      if (!cell && turn === (isPlayerX ? 'X' : 'O') && !winner) {
-        db.collection("games").doc(gameId).get().then(doc => {
-          const updatedBoard = [...doc.data().board];
-          updatedBoard[i] = isPlayerX ? 'X' : 'O';
-          db.collection("games").doc(gameId).update({
-            board: updatedBoard,
-            turn: isPlayerX ? 'O' : 'X'
-          });
+      if (winner || cell) return;
+
+      db.collection("games").doc(gameId).get().then(doc => {
+        const data = doc.data();
+        const currentTurn = data.turn;
+        const liveBoard = [...data.board];
+        const mySymbol = isPlayerX ? 'X' : 'O';
+
+        // ✅ Server-side turn validation
+        if (currentTurn !== mySymbol || liveBoard[i]) return;
+
+        liveBoard[i] = mySymbol;
+        db.collection("games").doc(gameId).update({
+          board: liveBoard,
+          turn: mySymbol === 'X' ? 'O' : 'X'
         });
-      }
+      });
     };
     boardDiv.appendChild(div);
   });
 }
 
-// ✅ Matchmaking with fair random roles
+// Matchmaking logic
 async function findMatch() {
   const waitRef = db.collection("waiting").doc("queue");
   const gamesRef = db.collection("games");
@@ -186,21 +191,21 @@ async function findMatch() {
   }
 }
 
-// ✅ Realtime Game Updates
+// Game updates listener
 function subscribeGame() {
-  cancelBtn.style.display = "none"; // hide cancel once match found
+  cancelBtn.style.display = "none";
 
   unsubGameListener = db.collection("games").doc(gameId).onSnapshot(doc => {
     const data = doc.data();
-    const me = isPlayerX ? "X" : "O";
-    const them = isPlayerX ? "O" : "X";
+    const mySymbol = isPlayerX ? "X" : "O";
+    const enemySymbol = isPlayerX ? "O" : "X";
 
     renderBoard(data.board, data.turn, data.winner);
 
     if (data.winner) {
       statusDiv.textContent =
-        data.winner === me ? "🎉 You Win!" :
-        data.winner === them ? "😢 You Lose!" :
+        data.winner === mySymbol ? "🎉 You Win!" :
+        data.winner === enemySymbol ? "😢 You Lose!" :
         "🤝 It's a Draw!";
 
       if (isPlayerX) {
@@ -211,7 +216,7 @@ function subscribeGame() {
 
       setTimeout(() => returnToStart(), 2000);
     } else {
-      statusDiv.textContent = data.turn === me ? "Your Turn" : "Opponent's Turn";
+      statusDiv.textContent = data.turn === mySymbol ? "Your Turn" : "Opponent's Turn";
     }
 
     if (!data.winner) {
@@ -222,7 +227,7 @@ function subscribeGame() {
   });
 }
 
-// ✅ Win Check
+// Win checker
 function checkWin(b) {
   const lines = [
     [0,1,2], [3,4,5], [6,7,8],
