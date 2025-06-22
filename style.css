@@ -28,3 +28,12 @@ h1 {
   cursor: pointer;
   user-select: none;
 }
+#rematchBtn {
+  padding: 10px 20px;
+  font-size: 18px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
