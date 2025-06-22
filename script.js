@@ -31,7 +31,7 @@ window.addEventListener("DOMContentLoaded", () => {
     userId = savedUser;
     gameId = savedGame;
     isPlayerX = savedRole === "true";
-    cleanupMatch(); // 🔥 Immediately clean up
+    cleanupMatch();
     localStorage.clear();
   }
 });
@@ -54,7 +54,7 @@ startBtn.onclick = () => {
     // Save for refresh recovery
     localStorage.setItem("userId", userId);
 
-    // Trap system back button AFTER a short delay
+    // Trap system back button
     setTimeout(() => {
       history.pushState(null, null, location.href);
       window.addEventListener("popstate", blockBack);
@@ -64,13 +64,13 @@ startBtn.onclick = () => {
   });
 };
 
-// ✅ Cancel
+// ✅ Cancel Matchmaking
 cancelBtn.onclick = () => {
   cleanupMatch();
   returnToStart();
 };
 
-// ✅ Return
+// ✅ Return to Start
 function returnToStart() {
   window.removeEventListener("popstate", blockBack);
   window.removeEventListener("beforeunload", cleanupMatch);
@@ -85,7 +85,7 @@ function returnToStart() {
   gameScreen.style.display = "none";
 }
 
-// ✅ Cleanup queue or game
+// ✅ Cleanup waiting or game
 function cleanupMatch() {
   const queueRef = db.collection("waiting").doc("queue");
   const gameRef = gameId ? db.collection("games").doc(gameId) : null;
@@ -112,7 +112,7 @@ function cleanupMatch() {
   }
 }
 
-// ✅ Board Rendering
+// ✅ Draw board
 function renderBoard(board, turn, winner) {
   boardDiv.innerHTML = '';
   board.forEach((cell, i) => {
@@ -135,7 +135,7 @@ function renderBoard(board, turn, winner) {
   });
 }
 
-// ✅ Matchmaking
+// ✅ Matchmaking with fair random roles
 async function findMatch() {
   const waitRef = db.collection("waiting").doc("queue");
   const gamesRef = db.collection("games");
@@ -146,22 +146,25 @@ async function findMatch() {
       tx.set(waitRef, { player: userId });
     } else {
       const opponent = doc.data().player;
+      const newDoc = gamesRef.doc();
+      const coinFlip = Math.random() < 0.5;
+
       const newGame = {
-        playerX: opponent,
-        playerO: userId,
+        playerX: coinFlip ? opponent : userId,
+        playerO: coinFlip ? userId : opponent,
         board: Array(9).fill(""),
         turn: "X",
         winner: null
       };
-      const newDoc = gamesRef.doc();
+
       tx.set(newDoc, newGame);
       tx.delete(waitRef);
-      gameId = newDoc.id;
-      isPlayerX = false;
 
-      // Save to recover
+      gameId = newDoc.id;
+      isPlayerX = !coinFlip;
+
       localStorage.setItem("gameId", gameId);
-      localStorage.setItem("isPlayerX", "false");
+      localStorage.setItem("isPlayerX", isPlayerX.toString());
     }
   });
 
@@ -183,9 +186,9 @@ async function findMatch() {
   }
 }
 
-// ✅ Listen to Game
+// ✅ Realtime Game Updates
 function subscribeGame() {
-  cancelBtn.style.display = "none"; // hide cancel once game starts
+  cancelBtn.style.display = "none"; // hide cancel once match found
 
   unsubGameListener = db.collection("games").doc(gameId).onSnapshot(doc => {
     const data = doc.data();
@@ -219,7 +222,7 @@ function subscribeGame() {
   });
 }
 
-// ✅ Check for Win
+// ✅ Win Check
 function checkWin(b) {
   const lines = [
     [0,1,2], [3,4,5], [6,7,8],
