@@ -104,6 +104,7 @@ function subscribeGame() {
       if (data.winner === mySymbol) statusDiv.textContent = "🎉 You Win!";
       else if (data.winner === enemySymbol) statusDiv.textContent = "😢 You Lose!";
       else statusDiv.textContent = "🤝 It's a Draw!";
+      rematchBtn.style.display = "inline-block";
     } else {
       statusDiv.textContent = data.turn === mySymbol ? "Your Turn" : "Opponent's Turn";
     }
